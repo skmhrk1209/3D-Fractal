@@ -5,6 +5,7 @@
 #include "cinder/CameraUi.h"
 #include "cinder/ImageIo.h"
 #include "cinder/gl/gl.h"
+#include "cinder/Rand.h"
 #include "cinder/Log.h"
 
 class FractalApp : public ci::app::App
@@ -27,13 +28,15 @@ public:
     ci::CameraUi mCameraUi;
 
     std::shared_ptr<ci::gl::GlslProg> mGlslProg;
+    
+    float mElapsedSeconds;
 };
 
-FractalApp::FractalApp() : mCameraUi(&mCameraPersp) {}
+FractalApp::FractalApp() : mCameraUi(&mCameraPersp), mElapsedSeconds(0.0) {}
 
 void FractalApp::setup()
 {
-    std::vector<ci::fs::path> glslPaths = {"shader.vert", "shader.frag"};
+    std::vector<ci::fs::path> glslPaths = {"Fractal.vert", "_Fractal.frag"};
     ci::FileWatcher::instance().watch(glslPaths, [&, this](const ci::WatchEvent &watchEvent) {
         try
         {
@@ -48,19 +51,24 @@ void FractalApp::setup()
 
     ci::gl::enableDepthRead();
     ci::gl::enableDepthWrite();
+    ci::gl::enableVerticalSync(false);
 
-    mCameraPersp.lookAt(ci::vec3(0.0, 0.0, 3.0), ci::vec3(0.0, 0.0, 0.0));
+    mCameraPersp.lookAt(ci::vec3(0.0, 0.0, 10.0), ci::vec3(0.0, 0.0, 0.0));
 }
 
 void FractalApp::update()
 {
     if (mGlslProg)
     {
-        mGlslProg->uniform("uCameraPosition", mCameraPersp.getEyePoint());
-        mGlslProg->uniform("uViewMatrix", mCameraPersp.getViewMatrix());
-        mGlslProg->uniform("uProjectionMatrix", mCameraPersp.getProjectionMatrix());
-        mGlslProg->uniform("uElapsedSeconds", static_cast<float>(getElapsedSeconds()));
+        mGlslProg->uniform("uCamera.position", mCameraPersp.getEyePoint());
+        mGlslProg->uniform("uCamera.viewMatrix", mCameraPersp.getViewMatrix());
+        mGlslProg->uniform("uCamera.projectionMatrix", mCameraPersp.getProjectionMatrix());
+        mGlslProg->uniform("uApp.time", static_cast<float>(getElapsedSeconds()));
     }
+    
+    auto elapsedSeconds = getElapsedSeconds();
+    CI_LOG_I("FPS: " + std::to_string(1 / (elapsedSeconds - mElapsedSeconds)));
+    mElapsedSeconds = elapsedSeconds;
 }
 
 void FractalApp::draw()
@@ -78,7 +86,7 @@ void FractalApp::resize()
     mCameraPersp.setAspectRatio(getWindow()->getAspectRatio());
     if (mGlslProg)
     {
-        mGlslProg->uniform("uResolution", ci::vec2(ci::app::toPixels(getWindowSize())));
+        mGlslProg->uniform("uApp.resolution", ci::vec2(ci::app::toPixels(getWindowSize())));
     }
 }
 
@@ -112,5 +120,5 @@ void FractalApp::mouseUp(ci::app::MouseEvent mouseEvent)
 
 CINDER_APP(FractalApp, ci::app::RendererGl(ci::app::RendererGl::Options().msaa(16)), [&](ci::app::App::Settings *settings) {
     settings->setHighDensityDisplayEnabled(true);
-    settings->setWindowSize(500, 500);
+    settings->setWindowSize(800, 800);
 })
